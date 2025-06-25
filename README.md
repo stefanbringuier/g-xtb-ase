@@ -1,4 +1,4 @@
-# ASE Wrapper for g-xTB
+# ASE Wrapper for g-xTB [![Example Runs](https://github.com/stefanbringuier/g-xtb-ase/actions/workflows/test.yml/badge.svg)](https://github.com/stefanbringuier/g-xtb-ase/actions/workflows/test.yml)
 
 ASE calculator wrapper for the development version of [g-xTB](https://github.com/grimme-lab/g-xtb).
 
