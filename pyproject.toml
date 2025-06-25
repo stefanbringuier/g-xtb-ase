@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=64", "wheel"]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "gxtb-ase"
-version = "0.1.0"
+dynamic = ["version"]
 description = "ASE calculator wrapper for g-xTB"
 authors = [{ name = "Stefan Bringuier", email = "stefanbringuier@gmail.com" }]
 license = {text = "GPL-3.0-or-later"}
@@ -37,4 +37,6 @@ Issues = "https://github.com/stefanbringuier/g-xtb-ase/issues"
 
 [tool.setuptools]
 packages = ["gxtb_ase"]
-include-package-data = true 
+include-package-data = true
+
+[tool.setuptools_scm] 

@@ -1,7 +1,7 @@
-include README.md
-include pyproject.toml
-recursive-include gxtb_ase *.py
-recursive-include vendor/g-xtb/binary *
-recursive-include vendor/g-xtb/parameters *
-include vendor/g-xtb/LICENSE
-include vendor/g-xtb/README.md 
+# setuptools-scm automatically includes all git-tracked files
+# Only need to exclude unwanted files
+prune .git
+prune .github  
+exclude .gitignore
+exclude .gitmodules
+global-exclude *.pyc __pycache__ 

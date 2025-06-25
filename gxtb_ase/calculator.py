@@ -103,37 +103,29 @@ class GxTB(FileIOCalculator):
         self.keep_files = keep_files
         self._temp_home = None
 
-        # Find packaged files
+        # Assumes setuptools-scm includes vendor/ as data
         try:
             import gxtb_ase
 
             pkg_path = Path(gxtb_ase.__file__).parent
 
-            # Look in relative path
+            # Try src tree
             binary_rel_path = "../vendor/g-xtb/binary/gxtb"
             self.binary_path = (pkg_path / binary_rel_path).resolve()
             param_rel_path = "../vendor/g-xtb/parameters"
             self.parameter_path = (pkg_path / param_rel_path).resolve()
 
-            # Check if they're in package dir
+            # If not, check installed package data location
             if not self.binary_path.exists():
-                for possible_binary in [
-                    pkg_path / "gxtb",
-                    pkg_path / "binary" / "gxtb",
-                    pkg_path.parent / "gxtb",
-                ]:
-                    if possible_binary.exists():
-                        self.binary_path = possible_binary
-                        break
+                # setuptools-scm copies vendor/ to site-packages root
+                site_packages = pkg_path.parent
+                self.binary_path = (
+                    site_packages / "vendor" / "g-xtb" / "binary" / "gxtb"
+                )
+                self.parameter_path = site_packages / "vendor" / "g-xtb" / "parameters"
 
-                # Look for parameter files
-                if self.binary_path.exists():
-                    param_path = self.binary_path.parent.parent / "parameters"
-                    self.parameter_path = param_path
-                    if not self.parameter_path.exists():
-                        self.parameter_path = self.binary_path.parent
         except ImportError:
-            # Fallback to source tree location
+            # Final fallback to git source
             pkg_dir = Path(__file__).parent.parent
             self.binary_path = pkg_dir / "vendor" / "g-xtb" / "binary" / "gxtb"
             self.parameter_path = pkg_dir / "vendor" / "g-xtb" / "parameters"
