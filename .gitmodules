@@ -1,0 +1,3 @@
+[submodule "vendor/g-xtb"]
+	path = vendor/g-xtb
+	url = https://github.com/grimme-lab/g-xtb.git

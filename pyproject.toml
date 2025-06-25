@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gxtb-ase"
+version = "0.1.0"
+description = "ASE calculator wrapper for g-xTB"
+authors = [{ name = "Stefan Bringuier", email = "stefanbringuier@gmail.com" }]
+license = {text = "GPL-3.0-or-later"}
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "ase>=3.22.0",
+    "numpy>=1.20.0",
+]
+keywords = ["ase", "quantum-chemistry", "semiempirical", "g-xtb"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+
+[project.urls]
+Homepage = "https://github.com/stefanbringuier/g-xtb-ase"
+Documentation = "https://github.com/stefanbringuier/g-xtb-ase#readme"
+Repository = "https://github.com/stefanbringuier/g-xtb-ase"
+Issues = "https://github.com/stefanbringuier/g-xtb-ase/issues"
+
+[tool.setuptools]
+packages = ["gxtb_ase"]
+include-package-data = true 
