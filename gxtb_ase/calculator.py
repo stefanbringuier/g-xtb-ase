@@ -418,6 +418,11 @@ class GxTB(FileIOCalculator):
             if restart_file.exists():
                 restart_file.unlink()
 
+        # Force log if dipole
+        need_dipole = "dipole" in properties
+        if need_dipole:
+            self.parameters["write_log"] = True
+
         # Build command based on properties
         force_grad = "forces" in properties and self.parameters.get("numerical_grad")
 
@@ -460,15 +465,36 @@ class GxTB(FileIOCalculator):
         energy = None
         dipole = None
 
+        # First try to parse from energy file
         energy_file = Path(self.directory) / "energy"
-
         if energy_file.exists():
             energy = self._parse_energy_file(energy_file)
 
+        # Parse dipole
+        log_file = Path(self.directory) / f"{self.label}.log"
+        if log_file.exists():
+            result = self._parse_output_file(log_file)
+            if isinstance(result, tuple):
+                log_energy, parsed_dipole = result
+                if energy is None:
+                    energy = log_energy
+                if parsed_dipole is not None:
+                    dipole = parsed_dipole
+            else:
+                if energy is None:
+                    energy = result
+
+        # Fallback to .out file if it exists
         if energy is None:
             output_file = Path(self.directory) / f"{self.label}.out"
             if output_file.exists():
-                energy = self._parse_output_file(output_file)
+                result = self._parse_output_file(output_file)
+                if isinstance(result, tuple):
+                    energy, parsed_dipole = result
+                    if parsed_dipole is not None:
+                        dipole = parsed_dipole
+                else:
+                    energy = result
 
         if energy is None:
             error_msg = "Could not parse energy from g-xTB calculation."
@@ -484,7 +510,7 @@ class GxTB(FileIOCalculator):
 
             raise RuntimeError(error_msg)
 
-        # Store results eV
+        # Store results in eV and eÅ
         self.results["energy"] = energy * Hartree
         if dipole is not None:
             self.results["dipole"] = dipole
@@ -505,20 +531,45 @@ class GxTB(FileIOCalculator):
         return None
 
     def _parse_output_file(self, output_file):
-        """Parse energy from g-xTB output file."""
+        """Parse energy and dipole from g-xTB output file."""
         energy = None
+        dipole = None
+
         with open(output_file, "r") as f:
             lines = f.readlines()
 
-        for i, line in enumerate(lines):
+        # Parse backwards to get final values
+        for i in range(len(lines) - 1, -1, -1):
+            line = lines[i]
+
             # Parse total energy - look for the final total energy line
             if line.strip().startswith("total") and len(line.split()) >= 2:
+                if energy is None:  # Get the last occurrence
+                    try:
+                        energy = float(line.split()[-1])
+                    except (ValueError, IndexError):
+                        continue
+
+            # FIXME:Parse final dipole moment
+            if "dipole moment  X         Y          Z" in line and i + 1 < len(lines):
                 try:
-                    energy = float(line.split()[-1])
+                    dipole_line = lines[i + 1].strip()
+                    parts = dipole_line.split()
+                    if len(parts) >= 3:
+                        # Get X, Y, Z components in atomic units
+                        dipole_x = float(parts[0])
+                        dipole_y = float(parts[1])
+                        dipole_z = float(parts[2])
+
+                        # Convert from atomic units to eÅ
+                        # 1 au = 2.541746473 eÅ
+                        conversion = 2.541746473
+                        dipole = np.array([dipole_x, dipole_y, dipole_z]) * conversion
+                        break
                 except (ValueError, IndexError):
                     continue
 
-        return energy
+        return energy, dipole
 
     def _parse_gradient(self, gradient_file):
         """Parse forces from TURBOMOLE gradient file."""
@@ -601,6 +652,18 @@ class GxTB(FileIOCalculator):
             self._cleanup_temp_home()
         except (AttributeError, OSError):
             pass  # Ignore errors during cleanup in destructor
+
+    def get_dipole_moment(self, atoms=None):
+        """Get dipole moment for ASE infrared calculations."""
+        if atoms is not None:
+            self.calculate(atoms, ["dipole"])
+
+        if "dipole" not in self.results:
+            raise RuntimeError(
+                "Dipole moment not available. " "Ensure calculator has been run."
+            )
+
+        return self.results["dipole"]
 
     def set(self, **kwargs):
         """Set parameters."""

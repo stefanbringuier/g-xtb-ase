@@ -44,8 +44,17 @@ jobs:
           cd examples
           uv run python water.py
 
+      - name: Test spectroscopy.py example
+        run: |
+          cd examples
+          uv run python spectroscopy.py
+
       - name: Check for output files
         run: |
           cd examples
           ls -la *.traj || echo "No trajectory files found"
           ls -la *.log || echo "No log files found"
+          ls -la IR/ || echo "No IR directory found"
+          ls -la IR/data/ || echo "No IR data files found"
+          ls -la IR/plots/ || echo "No IR plot files found"
+          ls -la IR/thermochemistry/ || echo "No thermochemistry files found"

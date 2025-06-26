@@ -4,6 +4,7 @@ from ase.build import molecule
 from ase.optimize import BFGS
 from ase.md.verlet import VelocityVerlet
 from ase import units
+from ase.io import read, write
 from gxtb_ase import GxTB
 
 
@@ -53,7 +54,7 @@ def main():
     print(f"Final energy (optimized):   {final_energy:.6f} eV")
     print(f"Energy lowering:            " f"{initial_energy - final_energy:.6f} eV")
 
-    print("\nRunning 100-step MD simulation...")
+    print("\nRunning 500-step MD simulation...")
     atoms_md = atoms_opt.copy()  # Use optimized geometry
 
     calc_md = GxTB(label="water_md", charge=0, write_log=True)
@@ -70,10 +71,13 @@ def main():
     ZeroRotation(atoms_md)
 
     dyn = VelocityVerlet(atoms_md, timestep=1.0 * units.fs, trajectory="water_md.traj")
-    dyn.run(100)
+    dyn.run(500)
 
     print("MD simulation complete. Trajectory saved to water_md.traj")
     print("View with: ase gui water_md.traj")
+
+    traj = read("water_md.traj", index=":")
+    write("water_md.extxyz", traj)
 
 
 if __name__ == "__main__":
