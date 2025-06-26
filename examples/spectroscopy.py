@@ -29,7 +29,7 @@ def calculate_ir_spectrum(atoms, name, ir_dir):
     atoms.calc = calc
 
     # Calculate IR intensities
-    ir = Infrared(atoms, name=f"{name}_ir", delta=0.005, nfree=4)
+    ir = Infrared(atoms, name=f"{name}_ir", delta=0.01, nfree=2)
     ir.run()
 
     spectrum_file = ir_dir / "data" / f"{name}_spectrum.dat"
