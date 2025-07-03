@@ -103,26 +103,44 @@ class GxTB(FileIOCalculator):
         self.keep_files = keep_files
         self._temp_home = None
 
-        # Assumes setuptools-scm includes vendor/ as data
+        # Find vendor directory in multiple possible locations
         try:
             import gxtb_ase
 
             pkg_path = Path(gxtb_ase.__file__).parent
 
-            # Try src tree
-            binary_rel_path = "../vendor/g-xtb/binary/gxtb"
-            self.binary_path = (pkg_path / binary_rel_path).resolve()
-            param_rel_path = "../vendor/g-xtb/parameters"
-            self.parameter_path = (pkg_path / param_rel_path).resolve()
+            # Search for vendor files in multiple locations
+            binary_candidates = [
+                # Installed package data (preferred)
+                pkg_path / "vendor" / "g-xtb" / "binary" / "gxtb",
+                # Source tree (development)
+                pkg_path.parent / "vendor" / "g-xtb" / "binary" / "gxtb",
+                # Site-packages level fallback
+                pkg_path.parent / "vendor" / "g-xtb" / "binary" / "gxtb",
+            ]
 
-            # If not, check installed package data location
-            if not self.binary_path.exists():
-                # setuptools-scm copies vendor/ to site-packages root
-                site_packages = pkg_path.parent
-                self.binary_path = (
-                    site_packages / "vendor" / "g-xtb" / "binary" / "gxtb"
-                )
-                self.parameter_path = site_packages / "vendor" / "g-xtb" / "parameters"
+            param_candidates = [
+                # Installed package data (preferred)
+                pkg_path / "vendor" / "g-xtb" / "parameters",
+                # Source tree (development)
+                pkg_path.parent / "vendor" / "g-xtb" / "parameters",
+                # Site-packages level fallback
+                pkg_path.parent / "vendor" / "g-xtb" / "parameters",
+            ]
+
+            # Find first existing binary
+            self.binary_path = None
+            for candidate in binary_candidates:
+                if candidate.exists():
+                    self.binary_path = candidate.resolve()
+                    break
+
+            # Find first existing parameter directory
+            self.parameter_path = None
+            for candidate in param_candidates:
+                if candidate.exists():
+                    self.parameter_path = candidate.resolve()
+                    break
 
         except ImportError:
             # Final fallback to git source
@@ -130,7 +148,22 @@ class GxTB(FileIOCalculator):
             self.binary_path = pkg_dir / "vendor" / "g-xtb" / "binary" / "gxtb"
             self.parameter_path = pkg_dir / "vendor" / "g-xtb" / "parameters"
 
-        if not self.binary_path.exists():
+        if not self.binary_path or not self.binary_path.exists():
+            # Provide helpful error message for debugging
+            try:
+                import gxtb_ase
+
+                pkg_path = Path(gxtb_ase.__file__).parent
+                searched_paths = [
+                    pkg_path / "vendor" / "g-xtb" / "binary" / "gxtb",
+                    pkg_path.parent / "vendor" / "g-xtb" / "binary" / "gxtb",
+                ]
+                error_msg = "g-xTB binary not found. Searched locations:\n" + "\n".join(
+                    f"  - {path} (exists: {path.exists()})" for path in searched_paths
+                )
+            except ImportError:
+                error_msg = "g-xTB binary not found and package import failed."
+
             raise CalculatorSetupError(
                 f"g-xTB binary not found at {self.binary_path}. "
                 "Please ensure the package is properly installed."
@@ -141,6 +174,12 @@ class GxTB(FileIOCalculator):
             self.binary_path.chmod(0o755)
 
         # Verify param files
+        if not self.parameter_path or not self.parameter_path.exists():
+            raise CalculatorSetupError(
+                f"Parameter directory not found. Expected at: {self.parameter_path}\n"
+                "Please ensure the package is properly installed with: pip install ."
+            )
+
         for param_file in [".gxtb", ".eeq", ".basisq"]:
             param_path = self.parameter_path / param_file
             if not param_path.exists():
@@ -150,7 +189,8 @@ class GxTB(FileIOCalculator):
                 else:
                     raise CalculatorSetupError(
                         f"Parameter file {param_file} not found in "
-                        f"{self.parameter_path} or {self.binary_path.parent}"
+                        f"{self.parameter_path} or {self.binary_path.parent}\n"
+                        "Please ensure the package is properly installed with: pip install ."
                     )
 
         # Base command

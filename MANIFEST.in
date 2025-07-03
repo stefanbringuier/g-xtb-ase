@@ -1,5 +1,15 @@
-# setuptools-scm automatically includes all git-tracked files
-# Only need to exclude unwanted files
+# Include essential package files
+include README.md
+include LICENSE
+include pyproject.toml
+
+# Include vendor directory with g-xtb binary and parameters  
+recursive-include vendor/g-xtb/binary *
+recursive-include vendor/g-xtb/parameters *
+include vendor/g-xtb/LICENSE
+include vendor/g-xtb/README.md
+
+# Exclude unwanted files
 prune .git
 prune .github  
 exclude .gitignore

@@ -35,8 +35,4 @@ Documentation = "https://github.com/stefanbringuier/g-xtb-ase#readme"
 Repository = "https://github.com/stefanbringuier/g-xtb-ase"
 Issues = "https://github.com/stefanbringuier/g-xtb-ase/issues"
 
-[tool.setuptools]
-packages = ["gxtb_ase"]
-include-package-data = true
-
 [tool.setuptools_scm] 

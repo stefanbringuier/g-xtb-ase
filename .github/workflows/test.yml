@@ -49,6 +49,28 @@ jobs:
           cd examples
           uv run python spectroscopy.py
 
+      - name: Test standalone installation
+        run: |
+          # Test that package works without source directory dependency
+          python -c "
+          import gxtb_ase
+          from gxtb_ase import GxTB
+          calc = GxTB()
+          print(f'Binary path: {calc.binary_path}')
+          print(f'Binary exists: {calc.binary_path.exists()}')
+          print(f'Parameters path: {calc.parameter_path}')
+          print(f'Parameters exist: {calc.parameter_path.exists()}')
+
+          # Verify files are in site-packages, not source
+          import site
+          site_packages = site.getsitepackages()[0]
+          if site_packages in str(calc.binary_path):
+              print('✅ Binary is in installed package')
+          else:
+              print('❌ Binary is NOT in installed package')
+              exit(1)
+          "
+
       - name: Check for output files
         run: |
           cd examples
