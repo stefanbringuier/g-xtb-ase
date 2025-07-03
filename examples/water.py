@@ -71,7 +71,7 @@ def main():
     ZeroRotation(atoms_md)
 
     dyn = VelocityVerlet(atoms_md, timestep=1.0 * units.fs, trajectory="water_md.traj")
-    dyn.run(500)
+    dyn.run(100)
 
     print("MD simulation complete. Trajectory saved to water_md.traj")
     print("View with: ase gui water_md.traj")

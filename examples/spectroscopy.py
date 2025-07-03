@@ -161,7 +161,8 @@ def main():
     (ir_dir / "plots").mkdir(exist_ok=True)
     (ir_dir / "thermochemistry").mkdir(exist_ok=True)
 
-    molecules = ["H2O", "NH3", "CH4", "SiH4", "AlCl3"]
+    # molecules = ["H2O", "NH3", "CH4", "SiH4", "AlCl3"]
+    molecules = ["H2O", "NH3"]
 
     print("=== g-XTB Spectroscopy Calculations ===")
     print(f"Calculating IR spectra for {len(molecules)} molecules")
