@@ -55,27 +55,33 @@ jobs:
 
       - name: Test standalone installation
         run: |
-          # Ensure we're using the installed package, not source
-          cd /tmp
-
-          # Test that package works without source directory dependency
-          python -c "
-          import gxtb_ase
-          from gxtb_ase import GxTB
-          calc = GxTB()
-          print(f'Binary path: {calc.binary_path}')
-          print(f'Binary exists: {calc.binary_path.exists()}')
-          print(f'Parameters path: {calc.parameter_path}')
-          print(f'Parameters exist: {calc.parameter_path.exists()}')
-
-          # Verify files are in site-packages, not source
+          # Verify vendor files are copied to installed package
+          uv run python -c "
           import site
+          from pathlib import Path
+
           site_packages = site.getsitepackages()[0]
-          if site_packages in str(calc.binary_path):
-              print('✅ Binary is in installed package')
-          else:
-              print('❌ Binary is NOT in installed package')
+          gxtb_package = Path(site_packages) / 'gxtb_ase'
+
+          # Check vendor files exist in installed package
+          binary_path = gxtb_package / 'vendor' / 'g-xtb' / 'binary' / 'gxtb'
+          param_dir = gxtb_package / 'vendor' / 'g-xtb' / 'parameters'
+
+          if not binary_path.exists():
+              print('ERROR: g-xtb binary not found in installed package')
               exit(1)
+
+          if not param_dir.exists():
+              print('ERROR: parameters directory not found in installed package')
+              exit(1)
+
+          # Check parameter files
+          for pf in ['.gxtb', '.eeq', '.basisq']:
+              if not (param_dir / pf).exists():
+                  print(f'ERROR: Parameter file {pf} missing')
+                  exit(1)
+
+          print('SUCCESS: All vendor files properly installed')
           "
 
       - name: Check for output files
