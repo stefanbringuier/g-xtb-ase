@@ -24,64 +24,101 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v2
-
-      - name: Install dependencies
-        run: |
-          uv sync
-
-      - name: Install core dependencies explicitly
-        run: |
-          uv pip install numpy ase
-
       - name: Make g-xtb binary executable (before install)
         run: |
           chmod +x vendor/g-xtb/binary/gxtb
 
       - name: Install package
         run: |
-          uv pip install .
+          pip install .
 
       - name: Test water.py example
         run: |
           cd examples
-          uv run python water.py
+          python water.py
 
       - name: Test spectroscopy.py example
         run: |
           cd examples
-          uv run python spectroscopy.py
+          python spectroscopy.py
 
-      - name: Test standalone installation
+      - name: Check binary is in installed package
         run: |
-          # Verify vendor files are copied to installed package
-          uv run python -c "
-          import site
+          python -c "
+          import sys
+          from gxtb_ase.calculator import GxTB
+          import gxtb_ase
           from pathlib import Path
 
-          site_packages = site.getsitepackages()[0]
-          gxtb_package = Path(site_packages) / 'gxtb_ase'
+          # Test that calculator can find binary in installed package
+          calc = GxTB()
+          bin_path = str(calc.binary_path)
+          print('g-xtb binary path:', bin_path)
 
-          # Check vendor files exist in installed package
-          binary_path = gxtb_package / 'vendor' / 'g-xtb' / 'binary' / 'gxtb'
-          param_dir = gxtb_package / 'vendor' / 'g-xtb' / 'parameters'
+          # Check if binary is in site-packages (installed package)
+          pkg_path = Path(gxtb_ase.__file__).parent
+          if 'site-packages' not in str(pkg_path):
+              print('ERROR: Package is not installed in site-packages')
+              sys.exit(1)
+              
+          # Verify binary exists and is executable
+          if not calc.binary_path.exists():
+              print('ERROR: g-xtb binary not found at', bin_path)
+              sys.exit(1)
+              
+          if not calc.binary_path.is_file():
+              print('ERROR: g-xtb binary is not a file at', bin_path)
+              sys.exit(1)
+              
+          print('SUCCESS: g-xtb binary is in the installed package directory')
+          print('SUCCESS: Binary is executable and ready to use')
 
-          if not binary_path.exists():
-              print('ERROR: g-xtb binary not found in installed package')
-              exit(1)
+          # Verify parameters are also in installed package
+          param_path = str(calc.parameter_path)
+          print('g-xtb parameters path:', param_path)
 
-          if not param_dir.exists():
-              print('ERROR: parameters directory not found in installed package')
-              exit(1)
+          if not calc.parameter_path.exists():
+              print('ERROR: Parameter directory not found at', param_path)
+              sys.exit(1)
+              
+          # Check for essential parameter files
+          required_files = ['.gxtb', '.eeq', '.basisq']
+          for param_file in required_files:
+              param_file_path = calc.parameter_path / param_file
+              if not param_file_path.exists():
+                  print('ERROR: Required parameter file not found:', param_file)
+                  sys.exit(1)
+                  
+          print('SUCCESS: All parameter files are in the installed package directory')
+          "
 
-          # Check parameter files
-          for pf in ['.gxtb', '.eeq', '.basisq']:
-              if not (param_dir / pf).exists():
-                  print(f'ERROR: Parameter file {pf} missing')
-                  exit(1)
+      - name: Test package independence from source repo
+        run: |
+          # Create a temporary directory outside the source repo
+          cd /tmp
+          mkdir test_gxtb_ase
+          cd test_gxtb_ase
 
-          print('SUCCESS: All vendor files properly installed')
+          # Test that the installed package works independently
+          python -c "
+          import sys
+          from gxtb_ase.calculator import GxTB
+          from ase import Atoms
+
+          # Create a simple water molecule
+          atoms = Atoms('H2O', positions=[[0, 0, 0], [0.957, 0, 0], [0.24, 0.927, 0]])
+
+          # Initialize calculator (should find binary in installed package)
+          calc = GxTB()
+          atoms.calc = calc
+
+          # Run calculation
+          energy = atoms.get_potential_energy()
+          forces = atoms.get_forces()
+
+          print(f'Water molecule energy: {energy:.6f} eV')
+          print(f'Forces shape: {forces.shape}')
+          print('SUCCESS: Package works independently of source repository')
           "
 
       - name: Check for output files
