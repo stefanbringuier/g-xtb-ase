@@ -42,101 +42,67 @@ jobs:
           cd examples
           python spectroscopy.py
 
-      - name: Check binary is in installed package
+      - name: Test package installation and independence
         run: |
+          # Create a temporary directory outside the source repo to ensure
+          # we are testing the installed package, not the local source.
+          TEST_DIR=$(mktemp -d)
+          cd $TEST_DIR
+
           python -c "
           import sys
-          from gxtb_ase.calculator import GxTB
-          import gxtb_ase
           from pathlib import Path
-
-          # Test that calculator can find binary in installed package
-          calc = GxTB()
-          bin_path = str(calc.binary_path)
-          print('g-xtb binary path:', bin_path)
-
-          # Check if binary is in site-packages (installed package)
-          pkg_path = Path(gxtb_ase.__file__).parent
-          if 'site-packages' not in str(pkg_path):
-              print('ERROR: Package is not installed in site-packages')
-              sys.exit(1)
-              
-          # Verify binary exists and is executable
-          if not calc.binary_path.exists():
-              print('ERROR: g-xtb binary not found at', bin_path)
-              sys.exit(1)
-              
-          if not calc.binary_path.is_file():
-              print('ERROR: g-xtb binary is not a file at', bin_path)
-              sys.exit(1)
-              
-          # Check if binary is actually in the installed package directory
-          installed_binary_path = pkg_path / 'vendor' / 'g-xtb' / 'binary' / 'gxtb'
-          if not installed_binary_path.exists():
-              print('ERROR: Binary not found in installed package at:', installed_binary_path)
-              sys.exit(1)
-              
-          print('SUCCESS: g-xtb binary is in the installed package directory')
-          print('SUCCESS: Binary is executable and ready to use')
-
-          # Verify parameters are also in installed package
-          param_path = str(calc.parameter_path)
-          print('g-xtb parameters path:', param_path)
-
-          if not calc.parameter_path.exists():
-              print('ERROR: Parameter directory not found at', param_path)
-              sys.exit(1)
-              
-          # Check for essential parameter files
-          required_files = ['.gxtb', '.eeq', '.basisq']
-          for param_file in required_files:
-              param_file_path = calc.parameter_path / param_file
-              if not param_file_path.exists():
-                  print('ERROR: Required parameter file not found:', param_file)
-                  sys.exit(1)
-                  
-          # Check if parameters are actually in the installed package directory
-          installed_param_path = pkg_path / 'vendor' / 'g-xtb' / 'parameters'
-          if not installed_param_path.exists():
-              print('ERROR: Parameters not found in installed package at:', installed_param_path)
-              sys.exit(1)
-              
-          for param_file in required_files:
-              installed_param_file = installed_param_path / param_file
-              if not installed_param_file.exists():
-                  print('ERROR: Required parameter file not found in installed package:', param_file)
-                  sys.exit(1)
-                  
-          print('SUCCESS: All parameter files are in the installed package directory')
-          "
-
-      - name: Test package independence from source repo
-        run: |
-          # Create a temporary directory outside the source repo
-          cd /tmp
-          mkdir test_gxtb_ase
-          cd test_gxtb_ase
-
-          # Test that the installed package works independently
-          python -c "
-          import sys
-          from gxtb_ase.calculator import GxTB
           from ase import Atoms
+          import gxtb_ase
+          from gxtb_ase import GxTB
 
-          # Create a simple water molecule
-          atoms = Atoms('H2O', positions=[[0, 0, 0], [0.957, 0, 0], [0.24, 0.927, 0]])
+          print('--- Verifying Package Installation ---')
 
-          # Initialize calculator (should find binary in installed package)
+          # 1. Check if the package is imported from site-packages
+          pkg_path = Path(gxtb_ase.__file__).parent
+          print(f'Package installed at: {pkg_path}')
+          if 'site-packages' not in str(pkg_path):
+              print('ERROR: Package is not installed in site-packages.')
+              sys.exit(1)
+          print('SUCCESS: Package is installed in site-packages.')
+
+          # 2. Initialize calculator and check its paths
+          # This should now find the binary and params in site-packages
           calc = GxTB()
-          atoms.calc = calc
+          print(f'Calculator found binary at: {calc.binary_path}')
+          print(f'Calculator found parameters at: {calc.parameter_path}')
 
-          # Run calculation
+          # 3. Verify binary path is the one in the installed package
+          installed_binary_path = pkg_path / 'vendor/g-xtb/binary/gxtb'
+          if not installed_binary_path.exists():
+              print(f'ERROR: Binary not found in installed package at: {installed_binary_path}')
+              sys.exit(1)
+          if not str(calc.binary_path) == str(installed_binary_path):
+              print(f'ERROR: Calculator is using wrong binary ({calc.binary_path}) instead of the installed one ({installed_binary_path})')
+              sys.exit(1)
+          print('SUCCESS: Calculator is using the correct binary from the installed package.')
+
+          # 4. Verify parameter path is the one in the installed package
+          installed_param_path = pkg_path / 'vendor/g-xtb/parameters'
+          if not installed_param_path.exists():
+              print(f'ERROR: Parameters not found in installed package at: {installed_param_path}')
+              sys.exit(1)
+          if not str(calc.parameter_path) == str(installed_param_path):
+              print(f'ERROR: Calculator is using wrong parameter path ({calc.parameter_path}) instead of the installed one ({installed_param_path})')
+              sys.exit(1)
+          print('SUCCESS: Calculator is using the correct parameters from the installed package.')
+
+          print('\n--- Testing Package Functionality ---')
+
+          # 5. Run a calculation to ensure it works end-to-end
+          atoms = Atoms('H2O', positions=[[0, 0, 0], [0.957, 0, 0], [0.24, 0.927, 0]])
+          atoms.calc = calc
           energy = atoms.get_potential_energy()
           forces = atoms.get_forces()
 
           print(f'Water molecule energy: {energy:.6f} eV')
           print(f'Forces shape: {forces.shape}')
-          print('SUCCESS: Package works independently of source repository')
+          print('\nSUCCESS: All checks passed. Package works independently of the source repository.')
           "
 
       - name: Check for output files
