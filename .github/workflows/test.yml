@@ -70,6 +70,12 @@ jobs:
               print('ERROR: g-xtb binary is not a file at', bin_path)
               sys.exit(1)
               
+          # Check if binary is actually in the installed package directory
+          installed_binary_path = pkg_path / 'vendor' / 'g-xtb' / 'binary' / 'gxtb'
+          if not installed_binary_path.exists():
+              print('ERROR: Binary not found in installed package at:', installed_binary_path)
+              sys.exit(1)
+              
           print('SUCCESS: g-xtb binary is in the installed package directory')
           print('SUCCESS: Binary is executable and ready to use')
 
@@ -87,6 +93,18 @@ jobs:
               param_file_path = calc.parameter_path / param_file
               if not param_file_path.exists():
                   print('ERROR: Required parameter file not found:', param_file)
+                  sys.exit(1)
+                  
+          # Check if parameters are actually in the installed package directory
+          installed_param_path = pkg_path / 'vendor' / 'g-xtb' / 'parameters'
+          if not installed_param_path.exists():
+              print('ERROR: Parameters not found in installed package at:', installed_param_path)
+              sys.exit(1)
+              
+          for param_file in required_files:
+              installed_param_file = installed_param_path / param_file
+              if not installed_param_file.exists():
+                  print('ERROR: Required parameter file not found in installed package:', param_file)
                   sys.exit(1)
                   
           print('SUCCESS: All parameter files are in the installed package directory')
