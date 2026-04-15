@@ -98,6 +98,11 @@ class GxTB(FileIOCalculator):
         **kwargs : dict
             Additional parameters: charge, spin, numerical_grad, etc.
         """
+        # Resolve directory to absolute path at init time so that files are
+        # written relative to the caller's working directory, not wherever
+        # the process cwd happens to be at calculation time.
+        directory = str(Path(directory).resolve())
+
         # g-xTB config for files
         self.tmpdir = tmpdir
         self.keep_files = keep_files
