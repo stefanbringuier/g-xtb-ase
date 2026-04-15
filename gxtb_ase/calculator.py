@@ -6,6 +6,8 @@ import tempfile
 import subprocess
 from pathlib import Path
 
+import re
+
 import numpy as np
 from ase.calculators.calculator import FileIOCalculator, all_changes
 from ase.calculators.calculator import CalculatorSetupError
@@ -458,11 +460,12 @@ class GxTB(FileIOCalculator):
             if restart_file.exists():
                 restart_file.unlink()
 
-        # Force log if dipole or charges
-        need_dipole = "dipole" in properties
-        need_charges = "charges" in properties
-        if need_dipole or need_charges:
-            self.parameters["write_log"] = True
+        # Always write the log temporarily so dipole, charges, and electronic
+        # properties (gap, IP, EA, spin) can be parsed. It is removed after
+        # parsing by _cleanup_calculation_files() if the user did not set
+        # write_log=True, matching the existing pattern for dipole/charges.
+        user_write_log = self.parameters.get("write_log", False)
+        self.parameters["write_log"] = True
 
         # Build command based on properties
         force_grad = "forces" in properties and self.parameters.get("numerical_grad")
@@ -485,6 +488,19 @@ class GxTB(FileIOCalculator):
         FileIOCalculator.calculate(self, atoms, properties, system_changes)
 
         self.read(self.label)
+
+        # ASE stores self.atoms as a copy (atoms.copy()), so gxtb_* keys
+        # written to self.atoms.info must be propagated back to the caller's
+        # atoms object so that atoms.info is populated after the call returns.
+        if atoms is not None:
+            for key, value in self.atoms.info.items():
+                if key.startswith("gxtb_"):
+                    atoms.info[key] = value
+
+        # Restore user's original write_log preference before cleanup,
+        # so that a temporarily-forced log file gets removed if the user
+        # didn't ask for it.
+        self.parameters["write_log"] = user_write_log
 
         self._cleanup_calculation_files()
 
@@ -534,6 +550,9 @@ class GxTB(FileIOCalculator):
                 if energy is None:
                     energy = result
 
+            # Extract electronic properties from log into atoms.info
+            self._parse_electronic_properties(log_file)
+
         # Fallback to .out file if it exists
         if energy is None:
             output_file = Path(self.directory) / f"{self.label}.out"
@@ -572,6 +591,89 @@ class GxTB(FileIOCalculator):
             self.results["dipole"] = dipole
         if charges is not None:
             self.results["charges"] = charges
+
+    def _parse_electronic_properties(self, log_file):
+        """Extract non-standard electronic properties from log and store in atoms.info.
+
+        Parses the g-xTB log file for properties such as the HOMO-LUMO gap,
+        IP, EA, and spin information, then attaches them to ``self.atoms.info``
+        under ``gxtb_``-prefixed keys so they are preserved alongside the
+        structure (e.g. in extXYZ files) without polluting ``calc.results``.
+
+        Parameters
+        ----------
+        log_file : Path
+            Path to the g-xTB log / output file.
+        """
+        if self.atoms is None:
+            return
+
+        props = self._parse_gxtb_log(str(log_file))
+
+        info_map = {
+            "gap_eV": "gxtb_gap_eV",
+            "is_uks": "gxtb_is_uks",
+            "IP_Janak_eV": "gxtb_IP_Janak_eV",
+            "EA_Janak_eV": "gxtb_EA_Janak_eV",
+            "spin_contamination": "gxtb_spin_contamination",
+            "nopen": "gxtb_nopen",
+            "nel": "gxtb_nel",
+        }
+
+        for key, info_key in info_map.items():
+            if key in props and props[key] is not None:
+                self.atoms.info[info_key] = props[key]
+
+    def _parse_gxtb_log(self, logfile: str) -> dict:
+        """Parse a g-xTB log file and return a dict of electronic properties.
+
+        Returns
+        -------
+        dict with keys: ``is_uks``, ``gap_eV``, ``nel``, ``nopen``,
+        ``IP_Janak_eV``, ``EA_Janak_eV``, ``spin_contamination``.
+        """
+        text = Path(logfile).read_text()
+        result = {}
+
+        m = re.search(r'^\s*nel\s+(\d+)', text, re.MULTILINE)
+        if m:
+            result['nel'] = int(m.group(1))
+        m = re.search(r'^\s*nopen\s+(\d+)', text, re.MULTILINE)
+        if m:
+            result['nopen'] = int(m.group(1))
+
+        is_uks = bool(re.search(r'UKS \?\s+T', text))
+        result['is_uks'] = is_uks
+
+        if is_uks:
+            gaps = {}
+            m = re.search(r'gap \(eV\)\s+alpha\s*->\s*alpha\s*:\s+([\d.]+)', text)
+            if m:
+                gaps['alpha_alpha'] = float(m.group(1))
+            m = re.search(r'beta\s*->\s*beta\s*:\s+([\d.]+)', text)
+            if m:
+                gaps['beta_beta'] = float(m.group(1))
+            m = re.search(r'alpha\s*->\s*beta\s*:\s+([\d.]+)', text)
+            if m:
+                gaps['alpha_beta'] = float(m.group(1))
+            result['gap_eV'] = gaps if gaps else None
+        else:
+            matches = re.findall(r'gap \(eV\)\s+:\s+([\d.]+)', text)
+            if matches:
+                result['gap_eV'] = float(matches[-1])
+
+        m = re.search(r"Janaks theorem for IP\s*:\s+([\d.]+)", text)
+        if m:
+            result['IP_Janak_eV'] = float(m.group(1))
+        m = re.search(r"Janaks theorem for EA\s*:\s+([\d.]+)", text)
+        if m:
+            result['EA_Janak_eV'] = float(m.group(1))
+
+        m = re.search(r'spin-contamination:\s+([\d.]+)', text)
+        if m:
+            result['spin_contamination'] = float(m.group(1))
+
+        return result
 
     def _parse_energy_file(self, energy_file):
         """Parse energy from TURBOMOLE-style energy file."""
