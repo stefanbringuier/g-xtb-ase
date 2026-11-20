@@ -60,13 +60,16 @@ class V2Tests(unittest.TestCase):
             run.stdout = "   for g-xTB:\n   for GFN2-xTB:\n"
             return run
 
-        with patch("gxtb_ase.v2.subprocess.run", side_effect=bibliography_only):
+        with patch("gxtb_ase.v2._run_xtb", side_effect=bibliography_only):
             with self.assertRaisesRegex(CalculationFailed, "ACP gradient"):
                 self.atoms.get_forces()
         self.assertFalse(self.calc.results)
 
     def test_dispatch_units_cache_and_option_changes(self):
-        with patch("gxtb_ase.v2.subprocess.run", side_effect=self.run_xtb) as run:
+        unpatched_run = subprocess.run
+        with patch("gxtb_ase.v2._run_xtb", side_effect=self.run_xtb) as run:
+            # NumPy can start a subprocess on its first access to np.testing.
+            self.assertIs(subprocess.run, unpatched_run)
             self.assertEqual(self.atoms.get_potential_energy(), -1.25 * Hartree)
             np.testing.assert_allclose(self.atoms.get_forces(),
                                       -Hartree / Bohr * np.array([[.1, .2, .3], [-.1, -.2, -.3]]))
@@ -83,7 +86,7 @@ class V2Tests(unittest.TestCase):
         self.assertTrue(all(not work.exists() for work in self.workdirs))
 
     def test_bad_input_refused_without_starting_xtb(self):
-        with patch("gxtb_ase.v2.subprocess.run") as run:
+        with patch("gxtb_ase.v2._run_xtb") as run:
             with self.assertRaises(PropertyNotImplementedError):
                 self.atoms.get_charges()
             with self.assertRaises(TypeError):
@@ -107,7 +110,7 @@ class V2Tests(unittest.TestCase):
     def test_reject_incompatible_spin_or_charge_before_execution(self):
         water = Atoms("OH2")
         for charge, uhf in [(1, 0), (0, 12), (11, None)]:
-            with self.subTest(charge=charge, uhf=uhf), patch("gxtb_ase.v2.subprocess.run") as run:
+            with self.subTest(charge=charge, uhf=uhf), patch("gxtb_ase.v2._run_xtb") as run:
                 self.calc.set(charge=charge, uhf=uhf)
                 with self.assertRaisesRegex(CalculationFailed, "electrons"):
                     self.calc.get_forces(water)
@@ -121,7 +124,7 @@ class V2Tests(unittest.TestCase):
             run.stdout = GXTB_RESULT + "number of unpaired electrons   2 e\n"
             return run
 
-        with patch("gxtb_ase.v2.subprocess.run", side_effect=wrong_spin):
+        with patch("gxtb_ase.v2._run_xtb", side_effect=wrong_spin):
             with self.assertRaisesRegex(CalculationFailed, "Requested uhf=0; g-xTB reported 2"):
                 self.atoms.get_forces()
         self.assertFalse(self.calc.results)
@@ -139,11 +142,11 @@ class V2Tests(unittest.TestCase):
 
             with self.subTest(message=message):
                 self.calc.results = {"energy": -15.0}
-                with patch("gxtb_ase.v2.subprocess.run", side_effect=fail):
+                with patch("gxtb_ase.v2._run_xtb", side_effect=fail):
                     with self.assertRaisesRegex(CalculationFailed, message):
                         self.calc.calculate(self.atoms)
                 self.assertEqual(self.calc.results, {})
-        with patch("gxtb_ase.v2.subprocess.run", side_effect=subprocess.TimeoutExpired("xtb", 1)):
+        with patch("gxtb_ase.v2._run_xtb", side_effect=subprocess.TimeoutExpired("xtb", 1)):
             with self.assertRaisesRegex(CalculationFailed, "timed out"):
                 self.calc.calculate(self.atoms)
         self.assertTrue(all(not work.exists() for work in self.workdirs))
@@ -161,7 +164,7 @@ class V2Tests(unittest.TestCase):
                 return run
 
             with self.subTest(message=message):
-                with patch("gxtb_ase.v2.subprocess.run", side_effect=malformed):
+                with patch("gxtb_ase.v2._run_xtb", side_effect=malformed):
                     with self.assertRaisesRegex(CalculationFailed, message):
                         self.calc.calculate(self.atoms)
                 self.assertFalse(self.calc.results)
@@ -171,7 +174,7 @@ class V2Tests(unittest.TestCase):
             (Path(kwargs["cwd"]) / "NOT_CONVERGED").touch()
             return run
 
-        with patch("gxtb_ase.v2.subprocess.run", side_effect=unconverged):
+        with patch("gxtb_ase.v2._run_xtb", side_effect=unconverged):
             with self.assertRaisesRegex(CalculationFailed, "SCF did not converge"):
                 self.calc.calculate(self.atoms)
 

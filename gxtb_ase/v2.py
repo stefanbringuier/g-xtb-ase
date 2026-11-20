@@ -4,7 +4,7 @@ import math
 import os
 from numbers import Integral, Real
 from pathlib import Path
-import subprocess
+from subprocess import TimeoutExpired, run as _run_xtb
 import tempfile
 
 import numpy as np
@@ -101,9 +101,9 @@ class GxTB2(Calculator):
                 "\n".join((str(len(atoms)), "gxtb-ase", *rows)) + "\n", encoding="ascii"
             )
             try:
-                run = subprocess.run(command, cwd=work, env=env, capture_output=True,
-                                     text=True, errors="replace", timeout=parameters.timeout)
-            except subprocess.TimeoutExpired as exc:
+                run = _run_xtb(command, cwd=work, env=env, capture_output=True,
+                               text=True, errors="replace", timeout=parameters.timeout)
+            except TimeoutExpired as exc:
                 raise CalculationFailed(f"g-xTB 2.x timed out after {parameters.timeout:g} s") from exc
             except OSError as exc:
                 raise CalculationFailed(f"Could not start g-xTB 2.x: {exc}") from exc
