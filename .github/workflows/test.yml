@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # setup-python still has builds here for Python 3.8 and 3.9
     strategy:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11"]
@@ -31,6 +31,12 @@ jobs:
       - name: Install package
         run: |
           pip install .
+
+      - name: Test the installed opt-in backend without an external executable
+        working-directory: ${{ runner.temp }}
+        env:
+          GXTB2_TEST_EXE: ""
+        run: python -m unittest discover -s "$GITHUB_WORKSPACE/tests" -v
 
       - name: Test water.py example
         run: |
